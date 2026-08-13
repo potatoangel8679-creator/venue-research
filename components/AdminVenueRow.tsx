@@ -21,8 +21,11 @@ export function AdminVenueRow({ venue, eventCount }: { venue: Venue; eventCount:
   return (
     <tr className="border-t border-line">
       <td className="px-4 py-3">
-        <Link href={`/venue/${venue.id}`} className="text-ink hover:text-teal-600">
+        <Link href={`/admin/venues/${venue.id}/edit`} className="text-ink hover:text-teal-600 font-medium">
           {venue.name}
+        </Link>
+        <Link href={`/venue/${venue.id}`} className="ml-2 text-xs text-subtle hover:text-teal-600">
+          (상세보기)
         </Link>
       </td>
       <td className="px-4 py-3 text-subtle">{venue.region ?? "확인 필요"}</td>

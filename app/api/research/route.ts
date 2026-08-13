@@ -5,6 +5,8 @@ import { searchPlacesByText, buildPhotoFetchUrl } from "@/lib/googlePlaces";
 import { getSearchProvider, buildResearchQueries, WebSearchResultItem } from "@/lib/searchProvider";
 import { extractEventsFromSearchResults } from "@/lib/aiExtract";
 
+export const dynamic = "force-dynamic";
+
 // 캐시 기준: 이 기간(일)보다 오래되었으면 재조사 대상으로 간주
 const STALE_DAYS = 30;
 

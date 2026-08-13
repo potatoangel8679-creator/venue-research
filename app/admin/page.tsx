@@ -3,6 +3,9 @@ import { AdminLoginForm } from "@/components/AdminLoginForm";
 import { supabaseServer } from "@/lib/supabase";
 import { AdminVenueRow } from "@/components/AdminVenueRow";
 import { Venue } from "@/types";
+import Link from "next/link";
+
+export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   if (!(await isAdminAuthenticated())) {
@@ -24,10 +27,20 @@ export default async function AdminPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
-      <h1 className="font-display text-2xl text-ink mb-1">관리자 페이지</h1>
-      <p className="text-sm text-subtle mb-8">
-        등록된 Venue와 과거 행사 데이터를 확인하고 관리합니다.
-      </p>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="font-display text-2xl text-ink mb-1">관리자 페이지</h1>
+          <p className="text-sm text-subtle">
+            등록된 Venue와 과거 행사 데이터를 확인하고 관리합니다.
+          </p>
+        </div>
+        <Link
+          href="/admin/venues/new"
+          className="bg-teal-600 text-white rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-teal-700 transition-colors shrink-0"
+        >
+          + 새 Venue 추가
+        </Link>
+      </div>
 
       <div className="bg-white border border-line rounded-card overflow-hidden">
         <table className="w-full text-sm">
