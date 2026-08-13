@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-fraunces: "Fraunces", Georgia, serif;
+  --font-inter: "Inter", system-ui, sans-serif;
+}
+
+body {
+  background-color: #f6f4ef;
+  color: #16181c;
+}
+
+@layer components {
+  .badge-confidence-high {
+    @apply bg-teal-50 text-teal-700 border border-teal-100;
+  }
+  .badge-confidence-medium {
+    @apply bg-gold-100 text-gold-600 border border-gold-100;
+  }
+  .badge-confidence-low {
+    @apply bg-white text-subtle border border-line;
+  }
+}
