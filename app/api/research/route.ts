@@ -9,7 +9,7 @@ import { extractEventsFromSearchResults } from "@/lib/aiExtract";
 const STALE_DAYS = 30;
 
 export async function POST(req: NextRequest) {
-  if (!isAdminAuthenticated()) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ error: "관리자 인증이 필요합니다." }, { status: 401 });
   }
 

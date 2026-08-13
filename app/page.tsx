@@ -52,10 +52,11 @@ async function fetchResults(params: VenueSearchParams): Promise<VenueSearchResul
 export default async function HomePage({
   searchParams
 }: {
-  searchParams: { [key: string]: string | undefined };
+  searchParams: Promise<{ [key: string]: string | undefined }>;
 }) {
-  const region = searchParams.region;
-  const attendance = searchParams.attendance ? Number(searchParams.attendance) : undefined;
+  const sp = await searchParams;
+  const region = sp.region;
+  const attendance = sp.attendance ? Number(sp.attendance) : undefined;
 
   const hasSearch = !!region && !!attendance;
 
@@ -67,10 +68,10 @@ export default async function HomePage({
       results = await fetchResults({
         region: region!,
         expectedAttendance: attendance!,
-        eventType: searchParams.eventType || undefined,
-        indoorOutdoor: (searchParams.indoorOutdoor as any) || undefined,
-        minAreaSqm: searchParams.minArea ? Number(searchParams.minArea) : undefined,
-        maxAreaSqm: searchParams.maxArea ? Number(searchParams.maxArea) : undefined
+        eventType: sp.eventType || undefined,
+        indoorOutdoor: (sp.indoorOutdoor as any) || undefined,
+        minAreaSqm: sp.minArea ? Number(sp.minArea) : undefined,
+        maxAreaSqm: sp.maxArea ? Number(sp.maxArea) : undefined
       });
     } catch (e: any) {
       searchError = e.message ?? "검색 중 오류가 발생했습니다.";
@@ -107,7 +108,7 @@ export default async function HomePage({
             <p className="text-sm text-ink/70 mb-6">
               <strong className="text-ink">
                 {attendance?.toLocaleString()}명 규모
-                {searchParams.eventType ? ` ${searchParams.eventType}` : ""}에 적합한 {region} Venue
+                {sp.eventType ? ` ${sp.eventType}` : ""}에 적합한 {region} Venue
               </strong>{" "}
               {results.length}곳을 찾았습니다.
             </p>

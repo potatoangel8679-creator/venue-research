@@ -1,261 +1,133 @@
+import { SearchBar } from "@/components/SearchBar";
+import { VenueCard } from "@/components/VenueCard";
 import { supabaseServer } from "@/lib/supabase";
-import { ConfidenceBadge } from "@/components/ConfidenceBadge";
-import { EventRecord, EventSource, Venue, VenuePhoto } from "@/types";
-import { notFound } from "next/navigation";
-import Image from "next/image";
+import { calculateVenueScore, buildReasonText } from "@/lib/scoring";
+import { EventRecord, Venue, VenueSearchParams, VenueSearchResult } from "@/types";
 
-const SOURCE_TYPE_LABEL: Record<string, string> = {
-  news: "뉴스기사",
-  press_release: "언론 보도자료",
-  brand_official: "브랜드 공식 홈페이지",
-  venue_official: "행사장 공식 홈페이지",
-  blog_review: "블로그 후기",
-  other: "기타 출처"
-};
-
-function InfoRow({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div className="flex justify-between py-2.5 border-b border-line last:border-0">
-      <span className="text-sm text-subtle">{label}</span>
-      <span className={`text-sm ${value ? "text-ink" : "text-subtle italic"}`}>
-        {value ?? "정보 확인 필요"}
-      </span>
-    </div>
-  );
-}
-
-export default async function VenueDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+async function fetchResults(params: VenueSearchParams): Promise<VenueSearchResult[]> {
   const supabase = supabaseServer();
 
-  const { data: venue } = await supabase
-    .from("venues")
+  // 1) 후보 Venue 조회 (지역/면적 등 1차 필터만 DB에서, 정교한 점수는 애플리케이션에서 계산)
+  let query = supabase.from("venues").select("*").ilike("region", `%${params.region}%`);
+
+  if (params.indoorOutdoor) query = query.eq("indoor_outdoor", params.indoorOutdoor);
+  if (params.minAreaSqm) query = query.gte("total_area_sqm", params.minAreaSqm);
+  if (params.maxAreaSqm) query = query.lte("total_area_sqm", params.maxAreaSqm);
+
+  const { data: venues, error } = await query;
+  if (error) throw error;
+  if (!venues || venues.length === 0) return [];
+
+  // 2) 각 Venue의 과거 행사 조회
+  const venueIds = venues.map((v: Venue) => v.id);
+  const { data: events, error: eventsError } = await supabase
+    .from("events")
     .select("*")
-    .eq("id", id)
-    .single<Venue>();
+    .in("venue_id", venueIds);
+  if (eventsError) throw eventsError;
 
-  if (!venue) notFound();
-
-  const [{ data: photos }, { data: events }] = await Promise.all([
-    supabase.from("venue_photos").select("*").eq("venue_id", venue.id),
-    supabase.from("events").select("*").eq("venue_id", venue.id).order("event_year", { ascending: false })
-  ]);
-
-  const eventIds = (events ?? []).map((e: EventRecord) => e.id);
-  const { data: sources } = eventIds.length
-    ? await supabase.from("event_sources").select("*").in("event_id", eventIds)
-    : { data: [] as EventSource[] };
-
-  const sourcesByEvent = new Map<string, EventSource[]>();
-  (sources ?? []).forEach((s: EventSource) => {
-    const list = sourcesByEvent.get(s.event_id) ?? [];
-    list.push(s);
-    sourcesByEvent.set(s.event_id, list);
+  const eventsByVenue = new Map<string, EventRecord[]>();
+  (events ?? []).forEach((e: EventRecord & { venue_id: string }) => {
+    const list = eventsByVenue.get(e.venue_id) ?? [];
+    list.push(e);
+    eventsByVenue.set(e.venue_id, list);
   });
 
-  const heroPhoto: VenuePhoto | undefined = (photos ?? [])[0];
+  // 3) 점수 계산 및 정렬
+  const results: VenueSearchResult[] = venues.map((venue: Venue) => {
+    const venueEvents = eventsByVenue.get(venue.id) ?? [];
+    const { score, breakdown } = calculateVenueScore(venue, venueEvents, params);
+    return {
+      venue,
+      score,
+      scoreBreakdown: breakdown,
+      matchedEventCount: venueEvents.length,
+      reason: buildReasonText(venue, venueEvents, params)
+    };
+  });
 
-  return (
-    <div className="max-w-5xl mx-auto px-6 py-10">
-      <div className="relative h-72 rounded-card overflow-hidden bg-teal-50">
-        <Image
-          src={heroPhoto?.url ?? "/placeholder-venue.svg"}
-          alt={venue.name}
-          fill
-          className="object-cover"
-        />
-      </div>
-
-      <div className="mt-6 flex items-start justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="font-display text-3xl text-ink">{venue.name}</h1>
-          <p className="text-subtle mt-1 text-sm">{venue.address ?? "주소 확인 필요"}</p>
-        </div>
-        {venue.google_maps_url && (
-          
-            href={venue.google_maps_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-teal-600 font-medium border border-teal-100 bg-teal-50 rounded-lg px-4 py-2 hover:bg-teal-100 transition-colors"
-          >
-            Google Maps에서 보기 →
-          </a>
-        )}
-      </div>
-
-      <div className="mt-10 grid lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1">
-          <h2 className="font-display text-lg
-cat "app/venue/[id]/page.tsx"
-cat "app/venue/[id]/page.tsx"
-git add .
-git commit -m "venue detail 파일 복구 및 params 수정"
-git push
-mkdir -p "app/venue/[id]"
-cat > "app/venue/[id]/page.tsx" << 'EOF'
-import { supabaseServer } from "@/lib/supabase";
-import { ConfidenceBadge } from "@/components/ConfidenceBadge";
-import { EventRecord, EventSource, Venue, VenuePhoto } from "@/types";
-import { notFound } from "next/navigation";
-import Image from "next/image";
-
-const SOURCE_TYPE_LABEL: Record<string, string> = {
-  news: "뉴스기사",
-  press_release: "언론 보도자료",
-  brand_official: "브랜드 공식 홈페이지",
-  venue_official: "행사장 공식 홈페이지",
-  blog_review: "블로그 후기",
-  other: "기타 출처"
-};
-
-function InfoRow({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div className="flex justify-between py-2.5 border-b border-line last:border-0">
-      <span className="text-sm text-subtle">{label}</span>
-      <span className={`text-sm ${value ? "text-ink" : "text-subtle italic"}`}>
-        {value ?? "정보 확인 필요"}
-      </span>
-    </div>
-  );
+  return results.sort((a, b) => b.score - a.score);
 }
 
-export default async function VenueDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const supabase = supabaseServer();
+export default async function HomePage({
+  searchParams
+}: {
+  searchParams: Promise<{ [key: string]: string | undefined }>;
+}) {
+  const sp = await searchParams;
+  const region = sp.region;
+  const attendance = sp.attendance ? Number(sp.attendance) : undefined;
 
-  const { data: venue } = await supabase
-    .from("venues")
-    .select("*")
-    .eq("id", id)
-    .single<Venue>();
+  const hasSearch = !!region && !!attendance;
 
-  if (!venue) notFound();
+  let results: VenueSearchResult[] = [];
+  let searchError: string | null = null;
 
-  const [{ data: photos }, { data: events }] = await Promise.all([
-    supabase.from("venue_photos").select("*").eq("venue_id", venue.id),
-    supabase.from("events").select("*").eq("venue_id", venue.id).order("event_year", { ascending: false })
-  ]);
-
-  const eventIds = (events ?? []).map((e: EventRecord) => e.id);
-  const { data: sources } = eventIds.length
-    ? await supabase.from("event_sources").select("*").in("event_id", eventIds)
-    : { data: [] as EventSource[] };
-
-  const sourcesByEvent = new Map<string, EventSource[]>();
-  (sources ?? []).forEach((s: EventSource) => {
-    const list = sourcesByEvent.get(s.event_id) ?? [];
-    list.push(s);
-    sourcesByEvent.set(s.event_id, list);
-  });
-
-  const heroPhoto: VenuePhoto | undefined = (photos ?? [])[0];
+  if (hasSearch) {
+    try {
+      results = await fetchResults({
+        region: region!,
+        expectedAttendance: attendance!,
+        eventType: sp.eventType || undefined,
+        indoorOutdoor: (sp.indoorOutdoor as any) || undefined,
+        minAreaSqm: sp.minArea ? Number(sp.minArea) : undefined,
+        maxAreaSqm: sp.maxArea ? Number(sp.maxArea) : undefined
+      });
+    } catch (e: any) {
+      searchError = e.message ?? "검색 중 오류가 발생했습니다.";
+    }
+  }
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-10">
-      <div className="relative h-72 rounded-card overflow-hidden bg-teal-50">
-        <Image
-          src={heroPhoto?.url ?? "/placeholder-venue.svg"}
-          alt={venue.name}
-          fill
-          className="object-cover"
-        />
-      </div>
+    <div>
+      <section className="max-w-6xl mx-auto px-6 pt-14 pb-10">
+        <h1 className="font-display text-3xl sm:text-4xl text-ink leading-tight max-w-xl">
+          근거 있는 행사장 추천, <br /> Venue Research
+        </h1>
+        <p className="text-subtle mt-3 max-w-lg text-sm leading-relaxed">
+          조건을 입력하면 실제 과거 행사 기록을 근거로 적합한 행사장을 추천합니다.
+          추정하지 않고, 확인된 정보만 보여드립니다.
+        </p>
 
-      <div className="mt-6 flex items-start justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="font-display text-3xl text-ink">{venue.name}</h1>
-          <p className="text-subtle mt-1 text-sm">{venue.address ?? "주소 확인 필요"}</p>
+        <div className="mt-8 max-w-3xl">
+          <SearchBar />
         </div>
-        {venue.google_maps_url && (
-          
-            href={venue.google_maps_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-teal-600 font-medium border border-teal-100 bg-teal-50 rounded-lg px-4 py-2 hover:bg-teal-100 transition-colors"
-          >
-            Google Maps에서 보기 →
-          </a>
+      </section>
+
+      <section className="max-w-6xl mx-auto px-6 pb-20">
+        {!hasSearch && (
+          <p className="text-sm text-subtle">지역과 예상 인원을 입력하고 검색해보세요.</p>
         )}
-      </div>
 
-      <div className="mt-10 grid lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1">
-          <h2 className="font-display text-lg text-ink mb-3">기본 정보</h2>
-          <div className="bg-white rounded-card border border-line p-5">
-            <InfoRow label="전체 면적" value={venue.total_area_sqm ? `${venue.total_area_sqm.toLocaleString()}㎡` : null} />
-            <InfoRow label="대관 가능 면적" value={venue.rentable_area_sqm ? `${venue.rentable_area_sqm.toLocaleString()}㎡` : null} />
-            <InfoRow label="최대 수용인원" value={venue.max_capacity ? `${venue.max_capacity.toLocaleString()}명` : null} />
-            <InfoRow label="좌석형 수용인원" value={venue.seated_capacity ? `${venue.seated_capacity.toLocaleString()}명` : null} />
-            <InfoRow label="스탠딩 수용인원" value={venue.standing_capacity ? `${venue.standing_capacity.toLocaleString()}명` : null} />
-            <InfoRow
-              label="실내/야외"
-              value={
-                venue.indoor_outdoor === "indoor" ? "실내" :
-                venue.indoor_outdoor === "outdoor" ? "야외" :
-                venue.indoor_outdoor === "both" ? "실내+야외" : null
-              }
-            />
-            <InfoRow label="주요 용도" value={venue.primary_use?.length ? venue.primary_use.join(" / ") : null} />
-            <InfoRow label="공식 홈페이지" value={venue.official_website} />
-          </div>
-        </div>
+        {hasSearch && searchError && (
+          <p className="text-sm text-red-600">검색 중 문제가 발생했습니다: {searchError}</p>
+        )}
 
-        <div className="lg:col-span-2">
-          <h2 className="font-display text-lg text-ink mb-3">
-            이 장소에서 진행된 행사 <span className="text-subtle text-sm font-normal">({(events ?? []).length}건 확인됨)</span>
-          </h2>
+        {hasSearch && !searchError && (
+          <>
+            <p className="text-sm text-ink/70 mb-6">
+              <strong className="text-ink">
+                {attendance?.toLocaleString()}명 규모
+                {sp.eventType ? ` ${sp.eventType}` : ""}에 적합한 {region} Venue
+              </strong>{" "}
+              {results.length}곳을 찾았습니다.
+            </p>
 
-          {(!events || events.length === 0) && (
-            <div className="bg-white rounded-card border border-line p-6 text-sm text-subtle">
-              아직 확인된 과거 행사 레퍼런스가 없습니다.
-            </div>
-          )}
-
-          <div className="space-y-4">
-            {(events ?? []).map((event: EventRecord) => {
-              const evSources = sourcesByEvent.get(event.id) ?? [];
-              return (
-                <div key={event.id} className="bg-white rounded-card border border-line p-5">
-                  <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div>
-                      <h3 className="font-medium text-ink">{event.event_name}</h3>
-                      <p className="text-xs text-subtle mt-0.5">
-                        {event.event_date ?? (event.event_year ? `${event.event_year}년` : "날짜 확인 필요")}
-                        {event.event_type ? ` · ${event.event_type}` : ""}
-                        {event.organizer ? ` · 주최: ${event.organizer}` : ""}
-                      </p>
-                    </div>
-                    <ConfidenceBadge level={event.confidence} />
-                  </div>
-
-                  {event.description && (
-                    <p className="text-sm text-ink/80 mt-3 leading-relaxed">{event.description}</p>
-                  )}
-
-                  {evSources.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-line">
-                      <p className="text-xs text-subtle mb-2">Evidence (근거자료 {evSources.length}건)</p>
-                      <div className="flex flex-wrap gap-2">
-                        {evSources.map((s) => (
-                          
-                            key={s.id}
-                            href={s.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs bg-paper border border-line rounded-full px-3 py-1.5 hover:border-teal-400 hover:text-teal-600 transition-colors"
-                          >
-                            {SOURCE_TYPE_LABEL[s.source_type] ?? "출처"} · {s.title}
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+            {results.length === 0 ? (
+              <p className="text-sm text-subtle">
+                조건에 맞는 Venue를 아직 찾지 못했습니다. 필터를 조정해보시거나,
+                관리자 페이지에서 신규 장소 리서치를 요청해보세요.
+              </p>
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {results.map((r) => (
+                  <VenueCard key={r.venue.id} result={r} />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
 }

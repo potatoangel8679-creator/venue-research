@@ -2,10 +2,10 @@ import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { AdminLoginForm } from "@/components/AdminLoginForm";
 import { supabaseServer } from "@/lib/supabase";
 import { AdminVenueRow } from "@/components/AdminVenueRow";
-import { Venue, EventRecord } from "@/types";
+import { Venue } from "@/types";
 
 export default async function AdminPage() {
-  if (!isAdminAuthenticated()) {
+  if (!(await isAdminAuthenticated())) {
     return <AdminLoginForm />;
   }
 
@@ -18,7 +18,7 @@ export default async function AdminPage() {
   const { data: events } = await supabase.from("events").select("id, venue_id, confidence");
 
   const eventCountByVenue = new Map<string, number>();
-  (events ?? []).forEach((e: EventRecord & { venue_id: string }) => {
+  (events ?? []).forEach((e: { id: string; venue_id: string; confidence: string }) => {
     eventCountByVenue.set(e.venue_id, (eventCountByVenue.get(e.venue_id) ?? 0) + 1);
   });
 
