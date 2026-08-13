@@ -24,13 +24,14 @@ function InfoRow({ label, value }: { label: string; value: string | null }) {
   );
 }
 
-export default async function VenueDetailPage({ params }: { params: { id: string } }) {
+export default async function VenueDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const supabase = supabaseServer();
 
   const { data: venue } = await supabase
     .from("venues")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", id)
     .single<Venue>();
 
   if (!venue) notFound();
